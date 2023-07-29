@@ -9,6 +9,8 @@ log.txt
 .vscode/
 npm-debug.log*
 
+HELP.md
+
 .idea/
 .ionic/
 .sourcemaps/

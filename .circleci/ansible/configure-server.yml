@@ -1,7 +1,7 @@
 ---
 
 - name: "configuration play." 
-  hosts: web
+  hosts: all
   user: ubuntu
   become: true
   become_method: sudo
@@ -25,4 +25,5 @@
     # Add more env vars here
 
   roles:
-    # Your code here
+    - configure-server
+    - configure-prometheus-node-exporter
