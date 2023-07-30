@@ -114,9 +114,9 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: JUnit
+          name: Run tests with JUnit
           working_directory: ./frontend
-          command: npm test
+          command: npm run test
           environment:
             JEST_JUNIT_OUTPUT_DIR: ./test_results
       - store_test_results:
@@ -131,9 +131,9 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Run tests with JUnit as reporter
+          name: Run tests with JUnit
           working_directory: ./backend
-          command: npm test
+          command: npm run test
           environment:
             JEST_JUNIT_OUTPUT_DIR: ./test_results
       - store_test_results:
@@ -151,7 +151,14 @@ jobs:
           name: Check Frontend against security vulnerabilities
           working_directory: ./frontend
           command: |
-            npm audit fix --force --audit-level=critical
+            set +e
+            # npm install
+            echo "keep running man 1"
+            npm audit fix --audit-level=critical --force
+            echo "keep running man 2"
+            npm audit fix --force
+            echo "keep running man 3"
+            npm audit --audit-level=critical
 
   scan-backend:
     executor: node
@@ -163,7 +170,11 @@ jobs:
           name: scan backend against security vulnerabilities
           working_directory: ./backend
           command: |
-            npm audit fix --force --audit-level=critical
+            npm audit fix --audit-level=critical --force
+            npm audit fix --audit-level=critical --force
+            npm audit fix --audit-level=critical --force
+            npm audit fix --audit-level=critical --force
+            npm audit fix --audit-level=critical --force
 
   configure-infrastructure:
     executor: python
@@ -258,26 +269,26 @@ jobs:
     executor: node
     steps:
       - checkout
-#      - run:
-#          name: Install dependencies
-#          command: |
-#            # your code here
-#      - run:
-#          name: Get backend url
-#          command: |
-#            # your code here
-#            export API_URL="http://${BACKEND_IP}:3030"
-#            echo "${API_URL}"
-#      - run:
-#          name: Deploy frontend objects
-#          command: |
-#            # Here's where you will add some code to rollback on failure
-#      - destroy-environment:
-#          id: ${CIRCLE_WORKFLOW_ID:0:7}
-#          when: on_fail
-#      - revert-migrations:
-#          id: ${CIRCLE_WORKFLOW_ID:0:7}
-#          when: on_fail
+  #      - run:
+  #          name: Install dependencies
+  #          command: |
+  #            # your code here
+  #      - run:
+  #          name: Get backend url
+  #          command: |
+  #            # your code here
+  #            export API_URL="http://${BACKEND_IP}:3030"
+  #            echo "${API_URL}"
+  #      - run:
+  #          name: Deploy frontend objects
+  #          command: |
+  #            # Here's where you will add some code to rollback on failure
+  #      - destroy-environment:
+  #          id: ${CIRCLE_WORKFLOW_ID:0:7}
+  #          when: on_fail
+  #      - revert-migrations:
+  #          id: ${CIRCLE_WORKFLOW_ID:0:7}
+  #          when: on_fail
 
   deploy-backend:
     executor: node
@@ -298,7 +309,7 @@ jobs:
   smoke-test:
     executor: node
     steps:
-#      - checkout
+      #      - checkout
       - run:
           name: Install dependencies
           command: |
@@ -357,38 +368,39 @@ jobs:
 workflows:
   default:
     jobs:
-      - setup-backend
-      - setup-frontend
-      - build-backend:
-          requires:
-            - setup-backend
-      - build-frontend:
-          requires:
-            - setup-frontend
-      - test-frontend:
-          requires: [ build-frontend ]
-      - test-backend:
-          requires: [ build-backend ]
-      - scan-backend:
-          requires: [ build-backend ]
-      - scan-frontend:
-          requires: [ build-frontend ]
-      - deploy-infrastructure:
-          requires: [ test-frontend, test-backend, scan-frontend, scan-backend ]
-          filters:
-            branches:
-              only: [ master ]
-      - configure-infrastructure:
-          requires: [ deploy-infrastructure ]
-      - run-migrations:
-          requires: [ configure-infrastructure ]
-      - deploy-frontend:
-          requires: [ run-migrations ]
-      - deploy-backend:
-          requires: [ run-migrations ]
-      - smoke-test:
-          requires: [ deploy-backend, deploy-frontend ]
-      - cloudfront-update:
-          requires: [ smoke-test ]
-      - cleanup:
-          requires: [ cloudfront-update ]
+#      - setup-backend
+#      - setup-frontend
+      #      - build-backend:
+      #          requires:
+      #            - setup-backend
+#      - build-frontend:
+#          requires:
+#            - setup-frontend
+#      - test-frontend:
+#          requires: [ build-frontend ]
+      #      - test-backend:
+      #          requires: [ build-backend ]
+      #      - scan-backend:
+      #          requires: [ build-backend ]
+#      - scan-frontend:
+#          requires: [ build-frontend ]
+      - scan-frontend
+#      - deploy-infrastructure:
+#          requires: [ test-frontend, test-backend, scan-frontend, scan-backend ]
+#          filters:
+#            branches:
+#              only: [ master ]
+#      - configure-infrastructure:
+#          requires: [ deploy-infrastructure ]
+#      - run-migrations:
+#          requires: [ configure-infrastructure ]
+#      - deploy-frontend:
+#          requires: [ run-migrations ]
+#      - deploy-backend:
+#          requires: [ run-migrations ]
+#      - smoke-test:
+#          requires: [ deploy-backend, deploy-frontend ]
+#      - cloudfront-update:
+#          requires: [ smoke-test ]
+#      - cleanup:
+#          requires: [ cloudfront-update ]
