@@ -47,7 +47,7 @@ commands:
           command: |
             SUCCESS=$(curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/DB_MIGRATION_<< parameters.id >>)
             echo $SUCCESS
-            if(( $SUCCESS==1 )); 
+            if(( $SUCCESS ==1 )); 
             then
               npm run migrations:revert
             fi
@@ -114,13 +114,9 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Install Junit coverage reporter
-          working_directory: ./frontend
-          command: npm install --save-dev jest-junit
-      - run:
           name: JUnit
           working_directory: ./frontend
-          command: npm test -- --ci --runInBand --reporters=default --reporters=jest-junit && pwd && ls -la /tmp
+          command: npm test
           environment:
             JEST_JUNIT_OUTPUT_DIR: ./test_results
       - store_test_results:
@@ -135,13 +131,9 @@ jobs:
       - attach_workspace:
           at: .
       - run:
-          name: Install junit coverage reporter
-          working_directory: ./backend
-          command: npm install --save-dev jest-junit
-      - run:
           name: Run tests with JUnit as reporter
           working_directory: ./backend
-          command: npm test -- --ci --runInBand --reporters=default --reporters=jest-junit && pwd
+          command: npm test
           environment:
             JEST_JUNIT_OUTPUT_DIR: ./test_results
       - store_test_results:

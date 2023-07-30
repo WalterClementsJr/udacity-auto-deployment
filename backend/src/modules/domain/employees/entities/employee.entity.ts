@@ -2,11 +2,9 @@ import * as moment from 'moment-timezone';
 import { AggregateRoot } from '../../../common/entities';
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
 import { CreateEmployee } from '../commands/create-employee.command';
-import { EmployeeCreated } from '../events/employee-created.event';
 
 @Entity()
 export class Employee extends AggregateRoot<number> {
-  //change <string> to <number> above to fix the compile error
   constructor(params = {} as CreateEmployee) {
     super();
     if (params) {
@@ -37,7 +35,6 @@ export class Employee extends AggregateRoot<number> {
   }
 
   @PrimaryGeneratedColumn()
-  //change <string> to <number> in line 8 to fix the compile error
   id: number;
 
   @Column({ length: 100 })
