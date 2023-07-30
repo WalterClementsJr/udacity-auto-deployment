@@ -95,8 +95,11 @@ jobs:
     executor: node
     steps:
       - checkout
+      - attach_workspace:
+          at: .
       - run:
           name: build backend
+          working_directory: ./backend
           command: |
             npm run build
       - persist_to_workspace:
