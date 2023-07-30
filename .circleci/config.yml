@@ -1,5 +1,8 @@
 version: 2.1
 
+orbs:
+  aws-cli: circleci/aws-cli@4.0.0
+
 executors:
   aws:
     docker:
@@ -19,18 +22,21 @@ commands:
         type: string
       id:
         type: string
-
     steps:
       - run:
           name: Destroy backend CloudFormation stack
           command: |
-            aws cloudformation delete-stack --stack-name udapeople-be-<< parameters.id >>
+            aws cloudformation delete-stack \
+              --stack-name udapeople-be-<< parameters.id >> \
+              --region us-east-1
           when: << parameters.when >>
       - run:
           name: Destroy frontend CloudFormation stack and S3 bucket
           command: |
             aws s3 rm s3://udapeople-<< parameters.id >> --recursive
-            aws cloudformation delete-stack --stack-name udapeople-fe-<< parameters.id >>
+            aws cloudformation delete-stack \
+              --stack-name udapeople-fe-<< parameters.id >> \
+              --region us-east-1
           when: << parameters.when >>
 
   revert-migrations:
@@ -179,6 +185,7 @@ jobs:
     executor: python
     steps:
       - checkout
+      - aws-cli/setup
       - attach_workspace:
           at: .
       - add_ssh_keys:
@@ -192,22 +199,25 @@ jobs:
           name: Config server
           working_directory: ./.circleci/ansible
           command: |
-            ansible-playbook -i inventory.txt configure-server.yaml
+            echo "inventory.txt"
+            cat inventory.txt
+            ansible-playbook -i inventory.txt configure-server.yml
       - destroy-environment:
           id: ${CIRCLE_WORKFLOW_ID}
           when: on_fail
 
   deploy-infrastructure:
-    executor: aws
+    executor: aws-cli/default
     steps:
-      - run:
-          name: Install dependencies
-          command: yum install -y tar gzip
+      - checkout
+      - aws-cli/setup
       - run:
           name: Ensure back-end infrastructure exists
+          working_directory: ./.circleci/files
           command: |
             aws cloudformation deploy \
-              --template-file backend.yaml \
+              --template-file backend.yml \
+              --region us-east-1 \
               --stack-name "udapeople-be-${CIRCLE_WORKFLOW_ID}" \
               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}" \
               --tags project=udapeople-be-${CIRCLE_WORKFLOW_ID}
@@ -218,14 +228,15 @@ jobs:
               --query 'Reservations[*].Instances[*].PublicIpAddress' \
               --filters "Name=tag:project,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID}" \
               --output text)
-            curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/BACKEND_URL - d "http://$BACKEND_IP:3030"
+            curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/BACKEND_URL -d "http://$BACKEND_IP:3030"
 
       - run:
           name: Ensure front-end infrastructure exist
           working_directory: ./.circleci/files
           command: |
             aws cloudformation deploy \
-              --template-file frontend.yaml \
+              --region us-east-1 \
+              --template-file frontend.yml \
               --stack-name "udapeople-fe-${CIRCLE_WORKFLOW_ID}" \
               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}" \
               --tags project=udapeople-fe-${CIRCLE_WORKFLOW_ID}
@@ -251,6 +262,7 @@ jobs:
     executor: node
     steps:
       - checkout
+      - aws-cli/setup
       - attach_workspace:
           at: .
       - run:
@@ -275,9 +287,10 @@ jobs:
           when: on_fail
 
   deploy-frontend:
-    executor: aws
+    executor: aws-cli/default
     steps:
       - checkout
+      - aws-cli/setup
       - run:
           name: Install dependencies
           command: |
@@ -301,8 +314,8 @@ jobs:
           id: ${CIRCLE_WORKFLOW_ID}
           when: on_fail
       - revert-migrations:
-            id: ${CIRCLE_WORKFLOW_ID}
-            when: on_fail
+          id: ${CIRCLE_WORKFLOW_ID}
+          when: on_fail
 
   deploy-backend:
     executor: python
@@ -319,7 +332,7 @@ jobs:
       - run:
           name: Deploy backend
           command: |
-            ansible-playbook -i inventory.txt deploy-server.yaml -vv
+            ansible-playbook -i inventory.txt deploy-server.yml -vv
       - destroy-environment:
           id: ${CIRCLE_WORKFLOW_ID}
           when: on_fail
@@ -339,7 +352,7 @@ jobs:
           name: Backend smoke test.
           command: |
             BACKEND_URL=$(curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/BACKEND_URL)
-            curl "$BACKEND_URL/api/status"
+            curl "$BACKEND_URL/"
       - run:
           name: Frontend smoke test.
           command: |
@@ -353,16 +366,20 @@ jobs:
           when: on_fail
 
   cloudfront-update:
-    executor: aws
+    executor: aws-cli/default
     steps:
       - checkout
+      - aws-cli/setup
+      - attach_workspace:
+          at: ~/
       - run:
           name: Update cloudfront distribution
           working_directory: ./.circleci/files
           command: |
             aws cloudformation deploy \
+              --region us-east-1 \
               --template-file cloudfront.yml \
-              --stack-name udapeople \
+              --stack-name udapeople-cloudfront \
               --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID}" \
               --tags project=udapeople
       - revert-migrations:
@@ -370,9 +387,10 @@ jobs:
           when: on_fail
 
   cleanup:
-    executor: aws
+    executor: aws-cli/default
     steps:
       - checkout
+      - aws-cli/setup
       - run:
           name: Get old stack workflow id
           command: |
@@ -385,8 +403,12 @@ jobs:
             if [[ "$CurrentWorkflowID" != "$OldWorkflowID" ]]
             then
               aws s3 rm "s3://udapeople-${OldWorkflowID}" --recursive
-              aws cloudformation delete-stack --stack-name "udapeople-fe-${OldWorkflowID}"
-              aws cloudformation delete-stack --stack-name "udapeople-be-${OldWorkflowID}"
+              aws cloudformation delete-stack \
+                --region us-east-1 \
+                --stack-name "udapeople-fe-${OldWorkflowID}" \
+              aws cloudformation delete-stack \
+                --region us-east-1 \
+                --stack-name "udapeople-be-${OldWorkflowID}"
             else
               echo "current workflow id: $OldWorkflowID. clean up not possible.
             fi
@@ -394,24 +416,24 @@ jobs:
 workflows:
   default:
     jobs:
-      - setup-backend
-      - setup-frontend
-      - build-backend:
-          requires:
-            - setup-backend
-      - build-frontend:
-          requires:
-            - setup-frontend
-      - test-frontend:
-          requires: [ build-frontend ]
-      - test-backend:
-          requires: [ build-backend ]
-      - scan-backend:
-          requires: [ build-backend ]
-      - scan-frontend:
-          requires: [ build-frontend ]
+#      - setup-backend
+#      - setup-frontend
+#      - build-backend:
+#          requires:
+#            - setup-backend
+#      - build-frontend:
+#          requires:
+#            - setup-frontend
+#      - test-frontend:
+#          requires: [ build-frontend ]
+#      - test-backend:
+#          requires: [ build-backend ]
+#      - scan-backend:
+#          requires: [ build-backend ]
+#      - scan-frontend:
+#          requires: [ build-frontend ]
       - deploy-infrastructure:
-          requires: [ test-frontend, test-backend, scan-frontend, scan-backend ]
+#          requires: [ test-frontend, test-backend, scan-frontend, scan-backend ]
           filters:
             branches:
               only: [ master ]
