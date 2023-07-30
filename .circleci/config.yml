@@ -152,12 +152,9 @@ jobs:
           working_directory: ./frontend
           command: |
             set +e
-            # npm install
-            echo "keep running man 1"
             npm audit fix --audit-level=critical --force
-            echo "keep running man 2"
-            npm audit fix --force
-            echo "keep running man 3"
+            # run again if still not fixed
+            npm audit fix --audit-level=critical --force
             npm audit --audit-level=critical
 
   scan-backend:
@@ -170,11 +167,13 @@ jobs:
           name: scan backend against security vulnerabilities
           working_directory: ./backend
           command: |
+            set +e
+            npm audit fix --audit-level=critical --force
+            # run again if still not fixed
             npm audit fix --audit-level=critical --force
             npm audit fix --audit-level=critical --force
             npm audit fix --audit-level=critical --force
-            npm audit fix --audit-level=critical --force
-            npm audit fix --audit-level=critical --force
+            npm audit --audit-level=critical
 
   configure-infrastructure:
     executor: python
@@ -212,6 +211,14 @@ jobs:
               --stack-name "udapeople-be-${CIRCLE_WORKFLOW_ID}" \
               --parameter-overrides ID="${CIRCLE_WORKFLOW_ID}" \
               --tags project=udapeople-be-${CIRCLE_WORKFLOW_ID}
+      - run:
+          name: Save BACKEND_URL in KVDB
+          command: |
+            BACKEND_IP=$(aws ec2 describe-instances \
+              --query 'Reservations[*].Instances[*].PublicIpAddress' \
+              --filters "Name=tag:project,Values=udapeople-backend-${CIRCLE_WORKFLOW_ID}" \
+              --output text)
+            curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/BACKEND_URL - d "http://$BACKEND_IP:3030"
 
       - run:
           name: Ensure front-end infrastructure exist
@@ -243,7 +250,9 @@ jobs:
   run-migrations:
     executor: node
     steps:
-      # Checkout code from git
+      - checkout
+      - attach_workspace:
+          at: .
       - run:
           name: Run migrations
           working_directory: ./backend
@@ -254,10 +263,10 @@ jobs:
           command: |
             if grep -q "has been executed successfully" migration_status
             then
-              echo "DB migration was successful, update kvdb..."
+              echo "Migration success, update kvdb"
               curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/migrateSuccess -d '1'
             else
-              echo "DB migration failed"
+              echo "Migration failed"
               curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/migrateSuccess -d '0'
             fi
             echo "WorkflowID=${CIRCLE_WORKFLOW_ID}"
@@ -266,82 +275,99 @@ jobs:
           when: on_fail
 
   deploy-frontend:
-    executor: node
+    executor: aws
     steps:
       - checkout
-  #      - run:
-  #          name: Install dependencies
-  #          command: |
-  #            # your code here
-  #      - run:
-  #          name: Get backend url
-  #          command: |
-  #            # your code here
-  #            export API_URL="http://${BACKEND_IP}:3030"
-  #            echo "${API_URL}"
-  #      - run:
-  #          name: Deploy frontend objects
-  #          command: |
-  #            # Here's where you will add some code to rollback on failure
-  #      - destroy-environment:
-  #          id: ${CIRCLE_WORKFLOW_ID:0:7}
-  #          when: on_fail
-  #      - revert-migrations:
-  #          id: ${CIRCLE_WORKFLOW_ID:0:7}
-  #          when: on_fail
-
-  deploy-backend:
-    executor: node
-    steps:
-      # Checkout code from git
-      # Add ssh keys with fingerprint
-      # attach workspace
       - run:
           name: Install dependencies
           command: |
-            # your code here
-      - run:
-          name: Deploy backend
-          command: |
-            # your code here
-      # Here's where you will add some code to rollback on failure
-
-  smoke-test:
-    executor: node
-    steps:
-      #      - checkout
-      - run:
-          name: Install dependencies
-          command: |
-            # your code here
+            apk add --update nodejs
       - run:
           name: Get backend url
           command: |
-            # your code here
+            export BACKEND_URL=$(curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/BACKEND_URL)
+            export BACKEND_URL="http://${BACKEND_IP}:3030"
+            echo "${BACKEND_URL}"
       - run:
-          name: Backend smoke test.
+          name: Deploy frontend objects
+          working_directory: ./frontend
           command: |
-            # your code here
-      - run:
-          name: Frontend smoke test.
-          command: |
-            # your code here
-      # Here's where you will add some code to rollback on failure
+            aws s3 cp ./dist "s3://udapeople-${CIRCLE_WORKFLOW_ID}" --recursive
+      - persist_to_workspace:
+          root: .
+          paths:
+            - frontend/dist
+      - destroy-environment:
+          id: ${CIRCLE_WORKFLOW_ID}
+          when: on_fail
+      - revert-migrations:
+            id: ${CIRCLE_WORKFLOW_ID}
+            when: on_fail
 
-  cloudfront-update:
-    executor: node
-    # Docker image here that supports AWS CLI
+  deploy-backend:
+    executor: python
     steps:
-      # Checkout code from git
+      - checkout
+      - add_ssh_keys:
+          fingerprints: [ "06:55:19:5c:75:9c:0c:fa:5e:f0:ed:c4:2b:35:ec:76" ]
+      - attach_workspace:
+          at: .
       - run:
           name: Install dependencies
           command: |
-            # your code here
+            apk add --update ansible aws-cli
+      - run:
+          name: Deploy backend
+          command: |
+            ansible-playbook -i inventory.txt deploy-server.yaml -vv
+      - destroy-environment:
+          id: ${CIRCLE_WORKFLOW_ID}
+          when: on_fail
+      - revert-migrations:
+          id: ${CIRCLE_WORKFLOW_ID}
+          when: on_fail
+
+  smoke-test:
+    executor: python
+    steps:
+      - checkout
+      - run:
+          name: Install dependencies
+          command: |
+            apk add --update curl aws-cli
+      - run:
+          name: Backend smoke test.
+          command: |
+            BACKEND_URL=$(curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/BACKEND_URL)
+            curl "$BACKEND_URL/api/status"
+      - run:
+          name: Frontend smoke test.
+          command: |
+            URL="http://udapeople-${CIRCLE_WORKFLOW_ID}.s3.us-east-1.amazonaws.com/index.html"
+            curl ${URL}
+      - destroy-environment:
+          id: ${CIRCLE_WORKFLOW_ID}
+          when: on_fail
+      - revert-migrations:
+          id: ${CIRCLE_WORKFLOW_ID}
+          when: on_fail
+
+  cloudfront-update:
+    executor: aws
+    steps:
+      - checkout
       - run:
           name: Update cloudfront distribution
+          working_directory: ./.circleci/files
           command: |
-            # your code here
-      # Here's where you will add some code to rollback on failure  
+            aws cloudformation deploy \
+              --template-file cloudfront.yml \
+              --stack-name udapeople \
+              --parameter-overrides WorkflowID="${CIRCLE_WORKFLOW_ID}" \
+              --tags project=udapeople
+      - revert-migrations:
+          id: ${CIRCLE_WORKFLOW_ID}
+          when: on_fail
 
   cleanup:
     executor: aws
@@ -368,39 +394,38 @@ jobs:
 workflows:
   default:
     jobs:
-#      - setup-backend
-#      - setup-frontend
-      #      - build-backend:
-      #          requires:
-      #            - setup-backend
-#      - build-frontend:
-#          requires:
-#            - setup-frontend
-#      - test-frontend:
-#          requires: [ build-frontend ]
-      #      - test-backend:
-      #          requires: [ build-backend ]
-      #      - scan-backend:
-      #          requires: [ build-backend ]
-#      - scan-frontend:
-#          requires: [ build-frontend ]
-      - scan-frontend
-#      - deploy-infrastructure:
-#          requires: [ test-frontend, test-backend, scan-frontend, scan-backend ]
-#          filters:
-#            branches:
-#              only: [ master ]
-#      - configure-infrastructure:
-#          requires: [ deploy-infrastructure ]
-#      - run-migrations:
-#          requires: [ configure-infrastructure ]
-#      - deploy-frontend:
-#          requires: [ run-migrations ]
-#      - deploy-backend:
-#          requires: [ run-migrations ]
-#      - smoke-test:
-#          requires: [ deploy-backend, deploy-frontend ]
-#      - cloudfront-update:
-#          requires: [ smoke-test ]
-#      - cleanup:
-#          requires: [ cloudfront-update ]
+      - setup-backend
+      - setup-frontend
+      - build-backend:
+          requires:
+            - setup-backend
+      - build-frontend:
+          requires:
+            - setup-frontend
+      - test-frontend:
+          requires: [ build-frontend ]
+      - test-backend:
+          requires: [ build-backend ]
+      - scan-backend:
+          requires: [ build-backend ]
+      - scan-frontend:
+          requires: [ build-frontend ]
+      - deploy-infrastructure:
+          requires: [ test-frontend, test-backend, scan-frontend, scan-backend ]
+          filters:
+            branches:
+              only: [ master ]
+      - configure-infrastructure:
+          requires: [ deploy-infrastructure ]
+      - run-migrations:
+          requires: [ configure-infrastructure ]
+      - deploy-frontend:
+          requires: [ run-migrations ]
+      - deploy-backend:
+          requires: [ run-migrations ]
+      - smoke-test:
+          requires: [ deploy-backend, deploy-frontend ]
+      - cloudfront-update:
+          requires: [ smoke-test ]
+      - cleanup:
+          requires: [ cloudfront-update ]
