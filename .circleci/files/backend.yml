@@ -28,8 +28,8 @@ Resources:
       InstanceType: t2.micro
       SecurityGroups:
         - Ref: InstanceSecurityGroup
-      KeyName: thiennt14
-      ImageId: ami-0c65adc9a5c1b5d7c
+      KeyName: udapeople
+      ImageId: ami-0261755bbcb8c4a84
       Tags:
         - Key: Name
           Value: !Sub backend-${ID}
