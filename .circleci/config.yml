@@ -189,12 +189,14 @@ jobs:
       - attach_workspace:
           at: .
       - add_ssh_keys:
-          fingerprints: [ "a8:96:02:c4:22:cd:bd:5c:41:0a:28:2a:67:13:86:8d:9b:a2:9f:4f" ]
+          fingerprints:
+#            - "3c:bc:00:d1:0d:dc:07:d8:00:93:30:14:7a:c5:2a:a8:24:d7:85:90"
+            - "96:49:d4:d1:f4:af:c9:72:93:f1:9f:5a:ff:c3:a1:7e"
       - run:
           name: Install dependencies
           working_directory: ./.circleci/ansible
           command: |
-            apk add --update ansible
+            apk add --update ansible openssh-client
       - run:
           name: Config server
           working_directory: ./.circleci/ansible
@@ -322,7 +324,9 @@ jobs:
     steps:
       - checkout
       - add_ssh_keys:
-          fingerprints: [ "06:55:19:5c:75:9c:0c:fa:5e:f0:ed:c4:2b:35:ec:76" ]
+          fingerprints:
+#            - "3c:bc:00:d1:0d:dc:07:d8:00:93:30:14:7a:c5:2a:a8:24:d7:85:90"
+            - "96:49:d4:d1:f4:af:c9:72:93:f1:9f:5a:ff:c3:a1:7e"
       - attach_workspace:
           at: .
       - run:
