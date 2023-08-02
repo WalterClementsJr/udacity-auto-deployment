@@ -10,7 +10,7 @@ Resources:
   WebsiteBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub "udapeople-${ID}"
+      BucketName: !Sub "udapeople-bucket-${ID}"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: false
       WebsiteConfiguration:
@@ -20,14 +20,18 @@ Resources:
   WebsiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref 'WebsiteBucket'
+      Bucket: !Ref WebsiteBucket
       PolicyDocument:
         Statement:
         - Sid: PublicReadForGetBucketObjects
           Effect: Allow
           Principal: '*'
-          Action: s3:GetObject
-          Resource: !Join ['', ['arn:aws:s3:::', !Ref 'WebsiteBucket', /*]]
+          Action: 's3:GetObject'
+          Resource: !Join
+            - ''
+            - - 'arn:aws:s3:::'
+              - !Ref WebsiteBucket
+              - /*
 
 Outputs:
   WebsiteURL:
