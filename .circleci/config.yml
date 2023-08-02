@@ -51,7 +51,7 @@ commands:
           name: Revert migrations
           when: << parameters.when >>
           command: |
-            SUCCESS=$(curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/DB_MIGRATION_<< parameters.id >>)
+            SUCCESS=$(curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/migration_<< parameters.id >>)
             echo $SUCCESS
             if(( $SUCCESS ==1 )); 
             then
@@ -60,19 +60,6 @@ commands:
 
 jobs:
 
-  setup-frontend:
-    executor: node
-    steps:
-      - checkout
-      - run:
-          name: npm install
-          working_directory: ./frontend
-          command: npm install
-      - persist_to_workspace:
-          root: .
-          paths:
-            - frontend/node_modules
-
   build-frontend:
     executor: node
     steps:
@@ -80,22 +67,21 @@ jobs:
       - attach_workspace:
           at: .
       - run:
+          name: npm install
+          working_directory: ./frontend
+          command: npm install
+      - run:
           name: npm run build
           working_directory: ./frontend
           command: npm run build
-
-  setup-backend:
-    executor: node
-    steps:
-      - checkout
-      - run:
-          name: npm install
-          working_directory: ./backend
-          command: npm install
+      - save_cache:
+          key: build-frontend
+          paths:
+            - ./frontend/node_modules
       - persist_to_workspace:
           root: .
           paths:
-            - backend/node_modules
+            - frontend/node_modules
 
   build-backend:
     executor: node
@@ -104,14 +90,23 @@ jobs:
       - attach_workspace:
           at: .
       - run:
+          name: npm install
+          working_directory: ./backend
+          command: npm install
+      - run:
           name: build backend
           working_directory: ./backend
           command: |
             npm run build
+      - save_cache:
+          key: build-backend
+          paths:
+            - ./backend/node_modules
       - persist_to_workspace:
           root: .
           paths:
             - backend/dist
+            - backend/node_modules
 
   test-frontend:
     executor: node
@@ -119,6 +114,8 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
+      - restore_cache:
+          key: build-frontend
       - run:
           name: Run tests with JUnit
           working_directory: ./frontend
@@ -136,6 +133,8 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
+      - restore_cache:
+          keys: [ build-backend ]
       - run:
           name: Run tests with JUnit
           working_directory: ./backend
@@ -153,6 +152,8 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
+      - restore_cache:
+          keys: [ build-frontend ]
       - run:
           name: Check Frontend against security vulnerabilities
           working_directory: ./frontend
@@ -169,6 +170,8 @@ jobs:
       - checkout
       - attach_workspace:
           at: .
+      - restore_cache:
+          keys: [ build-backend ]
       - run:
           name: scan backend against security vulnerabilities
           working_directory: ./backend
@@ -190,7 +193,6 @@ jobs:
           at: .
       - add_ssh_keys:
           fingerprints:
-#            - "3c:bc:00:d1:0d:dc:07:d8:00:93:30:14:7a:c5:2a:a8:24:d7:85:90"
             - "96:49:d4:d1:f4:af:c9:72:93:f1:9f:5a:ff:c3:a1:7e"
       - run:
           name: Install dependencies
@@ -267,10 +269,25 @@ jobs:
       - aws-cli/setup
       - attach_workspace:
           at: .
+      - restore_cache:
+          key: build-backend
       - run:
           name: Run migrations
           working_directory: ./backend
           command: |
+            npm i
+            sudo npm install pm2 -g
+            echo ENVIRONMENT=production > ".env"
+            echo TYPEORM_CONNECTION=postgres >> ".env"
+            echo TYPEORM_ENTITIES=./src/modules/domain/**/*.entity.ts >> ".env"
+            echo TYPEORM_MIGRATIONS=./src/migrations/*.ts >> ".env"
+            echo TYPEORM_MIGRATIONS_DIR=./src/migrations >> ".env"
+            echo NODE_ENV=production >> ".env"
+            echo TYPEORM_HOST=$TYPEORM_HOST >> ".env"
+            echo TYPEORM_PORT=$TYPEORM_PORT >> ".env"
+            echo TYPEORM_USERNAME=$TYPEORM_USERNAME >> ".env"
+            echo TYPEORM_PASSWORD=$TYPEORM_PASSWORD >> ".env"
+            echo TYPEORM_DATABASE=$TYPEORM_DATABASE >> ".env"
             npm run migrations > migration_status
       - run:
           name: Send migration results to KVDB
@@ -278,12 +295,15 @@ jobs:
             if grep -q "has been executed successfully" migration_status
             then
               echo "Migration success, update kvdb"
-              curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/migrateSuccess -d '1'
+              curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/migration_${CIRCLE_WORKFLOW_ID} -d '1'
             else
               echo "Migration failed"
-              curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/migrateSuccess -d '0'
+              curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/migration_${CIRCLE_WORKFLOW_ID} -d '0'
             fi
             echo "WorkflowID=${CIRCLE_WORKFLOW_ID}"
+      - revert-migrations:
+          id: ${CIRCLE_WORKFLOW_ID}
+          when: on_fail
       - destroy-environment:
           id: ${CIRCLE_WORKFLOW_ID}
           when: on_fail
@@ -325,7 +345,6 @@ jobs:
       - checkout
       - add_ssh_keys:
           fingerprints:
-#            - "3c:bc:00:d1:0d:dc:07:d8:00:93:30:14:7a:c5:2a:a8:24:d7:85:90"
             - "96:49:d4:d1:f4:af:c9:72:93:f1:9f:5a:ff:c3:a1:7e"
       - attach_workspace:
           at: .
@@ -420,38 +439,32 @@ jobs:
 workflows:
   default:
     jobs:
-#      - setup-backend
-#      - setup-frontend
-#      - build-backend:
-#          requires:
-#            - setup-backend
-#      - build-frontend:
-#          requires:
-#            - setup-frontend
-#      - test-frontend:
-#          requires: [ build-frontend ]
-#      - test-backend:
-#          requires: [ build-backend ]
-#      - scan-backend:
-#          requires: [ build-backend ]
-#      - scan-frontend:
-#          requires: [ build-frontend ]
-      - deploy-infrastructure:
+      - build-backend
+      - build-frontend
+      - test-frontend:
+          requires: [ build-frontend ]
+      - test-backend:
+          requires: [ build-backend ]
+      - scan-backend:
+          requires: [ build-backend ]
+      - scan-frontend:
+          requires: [ build-frontend ]
+#      - deploy-infrastructure:
 #          requires: [ test-frontend, test-backend, scan-frontend, scan-backend ]
-          filters:
-            branches:
-              only: [ master ]
-      - configure-infrastructure:
-          requires: [ deploy-infrastructure ]
-      - run-migrations:
-          requires: [ configure-infrastructure ]
-      - deploy-frontend:
-          requires: [ run-migrations ]
-      - deploy-backend:
-          requires: [ run-migrations ]
-      - smoke-test:
-          requires: [ deploy-backend, deploy-frontend ]
-      - cloudfront-update:
-          requires: [ smoke-test ]
-      - cleanup:
-          requires: [ cloudfront-update ]
+#          filters:
+#            branches:
+#              only: [ master ]
+#      - configure-infrastructure:
+#          requires: [ deploy-infrastructure ]
+#      - run-migrations:
+#          requires: [ configure-infrastructure ]
+#      - deploy-frontend:
+#          requires: [ run-migrations ]
+#      - deploy-backend:
+#          requires: [ run-migrations ]
+#      - smoke-test:
+#          requires: [ deploy-backend, deploy-frontend ]
+#      - cloudfront-update:
+#          requires: [ smoke-test ]
+#      - cleanup:
+#          requires: [ cloudfront-update ]
