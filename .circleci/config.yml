@@ -9,7 +9,7 @@ executors:
       - image: amazon/aws-cli
   node:
     docker:
-      - image: cimg/node:16.20.1
+      - image: cimg/node:13.8.0
   python:
     docker:
       - image: python:3.10-alpine
@@ -57,7 +57,7 @@ commands:
             then
               npm run migrations:revert
             fi
-
+            echo "reverted migration"
 jobs:
 
   build-frontend:
@@ -185,32 +185,6 @@ jobs:
             npm audit fix --audit-level=critical --force
             npm audit --audit-level=critical
 
-  configure-infrastructure:
-    executor: python
-    steps:
-      - checkout
-      - aws-cli/setup
-      - attach_workspace:
-          at: .
-      - add_ssh_keys:
-          fingerprints:
-            - "96:49:d4:d1:f4:af:c9:72:93:f1:9f:5a:ff:c3:a1:7e"
-      - run:
-          name: Install dependencies
-          working_directory: ./.circleci/ansible
-          command: |
-            apk add --update ansible openssh-client
-      - run:
-          name: Config server
-          working_directory: ./.circleci/ansible
-          command: |
-            echo "inventory.txt"
-            cat inventory.txt
-            ansible-playbook -i inventory.txt configure-server.yml
-      - destroy-environment:
-          id: ${CIRCLE_WORKFLOW_ID}
-          when: on_fail
-
   deploy-infrastructure:
     executor: aws-cli/default
     steps:
@@ -264,10 +238,35 @@ jobs:
           id: ${CIRCLE_WORKFLOW_ID}
           when: on_fail
 
+  configure-infrastructure:
+    executor: python
+    steps:
+      - checkout
+      - aws-cli/setup
+      - attach_workspace:
+          at: .
+      - add_ssh_keys:
+          fingerprints:
+            - "96:49:d4:d1:f4:af:c9:72:93:f1:9f:5a:ff:c3:a1:7e"
+      - run:
+          name: Install dependencies
+          command: |
+            apk add --update ansible openssh-client
+      - run:
+          name: Config server
+          working_directory: ./.circleci/ansible
+          command: |
+            cat inventory.txt
+            ansible-playbook -i inventory.txt configure-server.yml
+      - destroy-environment:
+          id: ${CIRCLE_WORKFLOW_ID}
+          when: on_fail
+
   run-migrations:
     executor: node
     steps:
       - checkout
+      - aws-cli/setup
       - attach_workspace:
           at: .
       - restore_cache:
@@ -276,21 +275,11 @@ jobs:
           name: Run migrations
           working_directory: ./backend
           command: |
-            npm i
+            set +e
+            npm install
             sudo npm install pm2 -g
-            echo ENVIRONMENT=production > ".env"
-            echo TYPEORM_CONNECTION=postgres >> ".env"
-            echo TYPEORM_ENTITIES=./src/modules/domain/**/*.entity.ts >> ".env"
-            echo TYPEORM_MIGRATIONS=./src/migrations/*.ts >> ".env"
-            echo TYPEORM_MIGRATIONS_DIR=./src/migrations >> ".env"
-            echo NODE_ENV=production >> ".env"
-            echo TYPEORM_HOST=$TYPEORM_HOST >> ".env"
-            echo TYPEORM_PORT=$TYPEORM_PORT >> ".env"
-            echo TYPEORM_USERNAME=$TYPEORM_USERNAME >> ".env"
-            echo TYPEORM_PASSWORD=$TYPEORM_PASSWORD >> ".env"
-            echo TYPEORM_DATABASE=$TYPEORM_DATABASE >> ".env"
+            cat .env
             npm run migrations > migration.log
-            cat migration.log
       - run:
           name: Send migration results to KVDB
           command: |
@@ -303,7 +292,7 @@ jobs:
               echo "Migration failed"
               curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/migration_${CIRCLE_WORKFLOW_ID} -d '0'
             fi
-
+            echo "WorkflowID=${CIRCLE_WORKFLOW_ID}"
       - revert-migrations:
           id: ${CIRCLE_WORKFLOW_ID}
           when: on_fail
@@ -323,20 +312,23 @@ jobs:
           at: .
       - run:
           name: Get backend url
+          working_directory: ./frontend
           command: |
             export BACKEND_URL=$(curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/BACKEND_URL)
+            echo "backend url: ${BACKEND_URL}"
 
             touch .env
-            echo "${BACKEND_URL}" >> .env
-            echo "backend url: ${BACKEND_URL}"
-            echo ${CIRCLE_WORKFLOW_ID}
-            echo "udapeople-${CIRCLE_WORKFLOW_ID}"
-            echo "${BACKEND_URL}" >> frontend/.env
-            cat frontend/.env
+            echo API_URL="${BACKEND_URL}" >> .env
+            echo NODE_ENV=production >> .env
+            echo ENVIRONMENT=production >> .env
+            cat .env
       - run:
           name: Deploy frontend objects
           working_directory: ./frontend
           command: |
+            npm audit fix --audit-level=critical 
+            npm install
+            npm run build
             aws s3 cp ./dist "s3://udapeople-bucket-${CIRCLE_WORKFLOW_ID}" --recursive
       - persist_to_workspace:
           root: .
