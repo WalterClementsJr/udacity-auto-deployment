@@ -9,13 +9,6 @@
     dest: /home/ubuntu/udapeople
     recursive: true
 
-- name: "copy node_modules"
-  become: true
-  synchronize:
-    src: ../../backend/node_modules
-    dest: /home/ubuntu/udapeople
-    recursive: true
-
 - name: "delete anything that might already be running"
   become: true
   command: pm2 delete all
