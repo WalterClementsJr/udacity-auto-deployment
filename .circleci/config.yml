@@ -276,10 +276,21 @@ jobs:
           working_directory: ./backend
           command: |
             set +e
-            npm install
+            npm i
             sudo npm install pm2 -g
-            cat .env
+            echo ENVIRONMENT=production > ".env"
+            echo TYPEORM_CONNECTION=postgres >> ".env"
+            echo TYPEORM_ENTITIES=./src/modules/domain/**/*.entity.ts >> ".env"
+            echo TYPEORM_MIGRATIONS=./src/migrations/*.ts >> ".env"
+            echo TYPEORM_MIGRATIONS_DIR=./src/migrations >> ".env"
+            echo NODE_ENV=production >> ".env"
+            echo TYPEORM_HOST=$TYPEORM_HOST >> ".env"
+            echo TYPEORM_PORT=$TYPEORM_PORT >> ".env"
+            echo TYPEORM_USERNAME=$TYPEORM_USERNAME >> ".env"
+            echo TYPEORM_PASSWORD=$TYPEORM_PASSWORD >> ".env"
+            echo TYPEORM_DATABASE=$TYPEORM_DATABASE >> ".env"
             npm run migrations > migration.log
+            cat migration.log
       - run:
           name: Send migration results to KVDB
           command: |
@@ -292,7 +303,6 @@ jobs:
               echo "Migration failed"
               curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/migration_${CIRCLE_WORKFLOW_ID} -d '0'
             fi
-            echo "WorkflowID=${CIRCLE_WORKFLOW_ID}"
       - revert-migrations:
           id: ${CIRCLE_WORKFLOW_ID}
           when: on_fail
@@ -307,7 +317,7 @@ jobs:
       - aws-cli/setup
       - run:
           name: Install dependencies
-          command: yum install -y tar gzip
+          command: yum install -y tar gzip nodejs npm
       - attach_workspace:
           at: .
       - run:
@@ -317,7 +327,6 @@ jobs:
             export BACKEND_URL=$(curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/BACKEND_URL)
             echo "backend url: ${BACKEND_URL}"
 
-            touch .env
             echo API_URL="${BACKEND_URL}" >> .env
             echo NODE_ENV=production >> .env
             echo ENVIRONMENT=production >> .env

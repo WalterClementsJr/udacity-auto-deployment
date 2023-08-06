@@ -40,21 +40,6 @@
       apt:
         upgrade: "yes"
 
-    - name: "install dependencies."
-      become: true
-      apt:
-        name: [ "nodejs", "npm" ]
-        state: latest
-        update_cache: yes
-
-    - name: "install pm2"
-      become: true
-      npm:
-        name: pm2
-        global: yes
-        production: yes
-        state: present
-
   # Get the environment variables from CircleCI and add to the EC2 instance
   environment:
     - TYPEORM_CONNECTION: "{{ lookup('env', 'TYPEORM_CONNECTION')}}"
