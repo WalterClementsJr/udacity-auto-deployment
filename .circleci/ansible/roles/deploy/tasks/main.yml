@@ -1,17 +1,43 @@
 ---
-- name: "show remote environment"
-  shell: env
+
+- name: populate /etc/environment
+  lineinfile:
+    path: "/etc/environment"
+    state: present
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value}}"
+
+  with_items: "{{ os_environment }}"
+  become: yes
+
   vars:
-    - ENVIRONMENT: production
-    - TYPEORM_CONNECTION: "{{ lookup('env', 'TYPEORM_CONNECTION') }}"
-    - TYPEORM_MIGRATIONS_DIR: "./migrations"
-    - TYPEORM_MIGRATIONS: "./migrations/*{.ts,.js}"
-    - TYPEORM_ENTITIES: "./modules/domain/**/*.entity{.ts,.js}"
-    - TYPEORM_HOST: "{{ lookup('env', 'TYPEORM_HOST') }}"
-    - TYPEORM_PORT: "{{ lookup('env', 'TYPEORM_PORT') }}"
-    - TYPEORM_USERNAME: "{{ lookup('env', 'TYPEORM_USERNAME') }}"
-    - TYPEORM_PASSWORD: "{{ lookup('env', 'TYPEORM_PASSWORD') }}"
-    - TYPEORM_DATABASE: "{{ lookup('env', 'TYPEORM_DATABASE') }}"
+    os_environment:
+      - key: ENVIRONMENT
+        value: "production"
+      - key: TYPEORM_CONNECTION
+        value: "{{ lookup('env','TYPEORM_CONNECTION') }}"
+      - key: TYPEORM_ENTITIES
+        value: "{{ lookup('env','TYPEORM_ENTITIES') }}"
+      - key: TYPEORM_MIGRATIONS
+        value: "{{ lookup('env','TYPEORM_MIGRATIONS') }}"
+      - key: TYPEORM_MIGRATIONS_DIR
+        value: "{{ lookup('env','TYPEORM_MIGRATIONS_DIR') }}"
+      - key: TYPEORM_HOST
+        value: "{{ lookup('env','TYPEORM_HOST') }}"
+      - key: TYPEORM_PORT
+        value: "{{ lookup('env','TYPEORM_PORT') }}"
+      - key: TYPEORM_USERNAME
+        value: "{{ lookup('env','TYPEORM_USERNAME') }}"
+      - key: TYPEORM_PASSWORD
+        value: "{{ lookup('env','TYPEORM_PASSWORD') }}"
+      - key: TYPEORM_DATABASE
+        value: "{{ lookup('env','TYPEORM_DATABASE') }}"
+      - key: TYPEORM_MIGRATIONS_DIR
+        value: ./migrations
+      - key: TYPEORM_ENTITIES
+        value: ./modules/domain/**/*.entity{.ts,.js}
+      - key: TYPEORM_MIGRATIONS
+        value: ./migrations/*{.ts,.js}
 
 - name: "copy backend binaries"
   become: true
@@ -21,18 +47,42 @@
     recursive: true
     rsync_opts:
       - "--exclude=node_modules"
+      - "--exclude=dist"
 
-- name: "delete any running pm2 app"
+- name: "Delete any running pm2 app"
   become: true
   command: pm2 delete all
   ignore_errors: true
 
-- name: "start server"
+- name: "Install"
+  become: true
+  command: npm install
+  args:
+    chdir: /home/ubuntu/udapeople/backend
+  ignore_errors: true
+
+- name: "Build"
   become: true
   shell: |
-    npm install
+    export NODE_ENV=production
     npm run build
-
-    ls
   args:
-    chdir: /home/ubuntu/udapeople
+    chdir: /home/ubuntu/udapeople/backend
+  ignore_errors: true
+
+- name: "Start server"
+  become: true
+  command: pm2 start main.js
+  args:
+    chdir: /home/ubuntu/udapeople/backend/dist
+#  vars:
+#    - ENVIRONMENT: production
+#    - TYPEORM_MIGRATIONS_DIR: "./migrations"
+#    - TYPEORM_MIGRATIONS: "./migrations/*{.ts,.js}"
+#    - TYPEORM_ENTITIES: "./modules/domain/**/*.entity{.ts,.js}"
+#    - TYPEORM_HOST: "{{ lookup('env', 'TYPEORM_HOST') }}"
+#    - TYPEORM_PORT: "{{ lookup('env', 'TYPEORM_PORT') }}"
+#    - TYPEORM_CONNECTION: "{{ lookup('env', 'TYPEORM_CONNECTION') }}"
+#    - TYPEORM_USERNAME: "{{ lookup('env', 'TYPEORM_USERNAME') }}"
+#    - TYPEORM_PASSWORD: "{{ lookup('env', 'TYPEORM_PASSWORD') }}"
+#    - TYPEORM_DATABASE: "{{ lookup('env', 'TYPEORM_DATABASE') }}"
