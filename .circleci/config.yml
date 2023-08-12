@@ -272,6 +272,10 @@ jobs:
       - restore_cache:
           key: build-backend
       - run:
+          name: Save the ID of the stack
+          command: |
+            curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/workflowid -d '${CIRCLE_WORKFLOW_ID}'
+      - run:
           name: Run migrations
           working_directory: ./backend
           command: |
