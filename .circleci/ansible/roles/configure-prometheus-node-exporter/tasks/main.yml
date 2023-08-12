@@ -1,3 +1,4 @@
+---
 - name: "install node exporter."
   unarchive:
     src: https://github.com/prometheus/node_exporter/releases/download/v0.17.0/node_exporter-0.17.0.linux-amd64.tar.gz
@@ -11,7 +12,7 @@
     dest: /usr/local/bin/node_exporter
     remote_src: yes
     mode: '0777'
-    
+
 - name: "add node exporter configuration."
   become: true
   copy:
@@ -25,3 +26,38 @@
     daemon_reload: yes
     name: node_exporter
     enabled: yes
+
+
+#- name: "prometheus config file"
+#  become: true
+#  copy:
+#    src: prometheus.yml
+#    dest: /etc/prometheus/prometheus.yml
+#
+#- name: "prometheus rules file"
+#  become: true
+#  copy:
+#    src: rules.yml
+#    dest: /etc/prometheus/rules.yml
+
+#- name: Stop existing Prometheus service
+#  become: true
+#  service:
+#    name: prometheus
+#    state: stopped
+#  ignore_errors: true
+
+#- name: Start Prometheus with updated configuration
+#  service:
+#    name: prometheus
+#    state: started
+#    args:
+#  vars: "--config.file=/etc/prometheus/prometheus.yml"
+
+#- name: "Start prometheus"
+#  become: true
+#  service:
+#    name: prometheus
+#    state: started
+#    enabled: yes
+#  command: prometheus --config.file=/etc/prometheus/prometheus.yml
