@@ -4,16 +4,16 @@ https://github.com/WalterClementsJr/udacity-auto-deployment
 
 - Evidence of deployed and functioning front-end application in an S3 bucket [URL02]
 
-http://udapeople-bucket-4ce4c281-0168-40d3-86c3-b79248da27e7.s3.amazonaws.com/index.html
+http://udapeople-bucket-3d7bf2e8-e2ca-448f-9083-ec3fb68b3db3.s3.amazonaws.com/index.html#/employees
 
 - Evidence of deployed and functioning front-end application in CloudFront. [URL03]
 
-http://d2h654h0kfg97w.cloudfront.net
+http://d27dfkvz4ansic.cloudfront.net/#/employees
 
 - Evidence of healthy back-end application. [URL04]
 
-http://ec2-18-208-163-27.compute-1.amazonaws.com:3030/
+http://ec2-3-91-251-81.compute-1.amazonaws.com:3030/
 
 - Public URL to your Prometheus Server [URL05]
 
-ec2-54-91-101-197.compute-1.amazonaws.com:9090
+ec2-54-227-30-132.compute-1.amazonaws.com:9090/

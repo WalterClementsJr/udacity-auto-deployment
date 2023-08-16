@@ -283,6 +283,7 @@ jobs:
             cat migration.log
       - run:
           name: Send migration results to KVDB
+          working_directory: ./backend
           command: |
             echo "WorkflowID=${CIRCLE_WORKFLOW_ID}"
             if grep -c "executed successfully" migration.log
@@ -439,18 +440,18 @@ jobs:
 workflows:
   default:
     jobs:
-#      - build-backend
-#      - build-frontend
-#      - test-frontend:
-#          requires: [ build-frontend ]
-#      - test-backend:
-#          requires: [ build-backend ]
-#      - scan-backend:
-#          requires: [ build-backend ]
-#      - scan-frontend:
-#          requires: [ build-frontend ]
+      - build-backend
+      - build-frontend
+      - test-frontend:
+          requires: [ build-frontend ]
+      - test-backend:
+          requires: [ build-backend ]
+      - scan-backend:
+          requires: [ build-backend ]
+      - scan-frontend:
+          requires: [ build-frontend ]
       - deploy-infrastructure:
-#          requires: [ test-frontend, test-backend, scan-frontend, scan-backend ]
+          requires: [ test-frontend, test-backend, scan-frontend, scan-backend ]
           filters:
             branches:
               only: [ master ]
