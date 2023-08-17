@@ -1,63 +1,98 @@
-We are archiving this repository because we do not want learners to push personal development to the current repository. If you have any issues or suggestions to make, feel free to:
-- Utilize the https://knowledge.udacity.com/ forum to seek help on content-specific issues.
-- [Submit a support ticket](https://udacity.zendesk.com/hc/en-us/requests/new) along with the link to your forked repository. 
-- If you are an enterprise learner, please [Submit a support ticket here](https://udacityenterprise.zendesk.com/hc/en-us/requests/new?ticket_form_id=360000279131)
+# Give your Application Auto-Deploy Superpowers
 
-## Give your Application Auto-Deploy Superpowers
+## Guides/Instructions
 
-In this project, you will prove your mastery of the following learning objectives:
+### The app
 
-- Explain the fundamentals and benefits of CI/CD to achieve, build, and deploy automation for cloud-based software products.
-- Utilize Deployment Strategies to design and build CI/CD pipelines that support Continuous Delivery processes.
-- Utilize a configuration management tool to accomplish deployment to cloud-based servers.
-- Surface critical server errors for diagnosis using centralized structured logging.
+use Node 13.8.0.
+I spent too much time to make it work with Node 16/18.
+It's not worth it.
 
-![Diagram of CI/CD Pipeline we will be building.](udapeople.png)
+I also made several changes to the source code itself to be able to run build without errors (outside the ones udacity
+gave, of course).
 
-### Instructions
+### infrastructure
 
-* [Selling CI/CD](instructions/0-selling-cicd.md)
-* [Getting Started](instructions/1-getting-started.md)
-* [Deploying Working, Trustworthy Software](instructions/2-deploying-trustworthy-code.md)
-* [Configuration Management](instructions/3-configuration-management.md)
-* [Turn Errors into Sirens](instructions/4-turn-errors-into-sirens.md)
+1. Prometheus server
 
-### Project Submission
+- choose an alerting solution.
+  I chose [slack](https://grafana.com/blog/2020/02/25/step-by-step-guide-to-setting-up-prometheus-alertmanager-with-slack-pagerduty-and-gmail/).
+- run [prometheus-server CloudFormation script](.circleci/files/prometheus-server.yml)
 
-For your submission, please submit the following:
+- install Prometheus and AlertManager
 
-- A text file named `urls.txt` including:
-  1. Public Url to GitHub repository (not private) [URL01]
-  1. Public URL for your S3 Bucket (aka, your green candidate front-end) [URL02]
-  1. Public URL for your CloudFront distribution (aka, your blue production front-end) [URL03]
-  1. Public URLs to deployed application back-end in EC2 [URL04]
-  1. Public URL to your Prometheus Server [URL05]
-- Your screenshots in JPG or PNG format, named using the screenshot number listed in the instructions. These screenshots should be included in your code repository in the root folder.
-  1. Job failed because of compile errors. [SCREENSHOT01]
-  1. Job failed because of unit tests. [SCREENSHOT02]
-  1. Job that failed because of vulnerable packages. [SCREENSHOT03]
-  1. An alert from one of your failed builds. [SCREENSHOT04]
-  1. Appropriate job failure for infrastructure creation. [SCREENSHOT05]
-  1. Appropriate job failure for the smoke test job. [SCREENSHOT06]
-  1. Successful rollback after a failed smoke test. [SCREENSHOT07]  
-  1. Successful promotion job. [SCREENSHOT08]
-  1. Successful cleanup job. [SCREENSHOT09]
-  1. Only deploy on pushed to `master` branch. [SCREENSHOT10]
-  1. Provide a screenshot of a graph of your EC2 instance including available memory, available disk space, and CPU usage. [SCREENSHOT11]
-  1. Provide a screenshot of an alert that was sent by Prometheus. [SCREENSHOT12]
+```bash
+sudo apt update
+# install any text editor
+sudo apt install vim
 
-- Your presentation should be in PDF format named "presentation.pdf" and should be included in your code repository root folder. 
+# prometheus
+wget https://github.com/prometheus/prometheus/releases/download/v2.43.0/prometheus-2.43.0.linux-amd64.tar.gz
+tar vxf prometheus*.tar.gz
 
-Before you submit your project, please check your work against the project rubric. If you haven’t satisfied each criterion in the rubric, then revise your work so that you have met all the requirements. 
+cd prometheus*/
+# create prometheus config file
+# see .circleci/ansible/roles/configure-prometheus-node-exporter/files/prometheus.yml for a quick solution
+vim prometheus.yml
+# start prometheus
+prometheus --web.enable-lifecycle
 
-### Built With
+# alertmanager
+wget https://github.com/prometheus/alertmanager/releases/download/v0.25.0/alertmanager-0.25.0.linux-amd64.tar.gz
+tar vxf alertmanager*.tar.gz
+# .circleci/ansible/roles/configure-prometheus-node-exporter/files/alertmanager.yml
+vim alertmanager.yml
+# start alert manager
+alertmanager &
+```
 
-- [Circle CI](www.circleci.com) - Cloud-based CI/CD service
-- [Amazon AWS](https://aws.amazon.com/) - Cloud services
-- [AWS CLI](https://aws.amazon.com/cli/) - Command-line tool for AWS
-- [CloudFormation](https://aws.amazon.com/cloudformation/) - Infrastrcuture as code
-- [Ansible](https://www.ansible.com/) - Configuration management tool
-- [Prometheus](https://prometheus.io/) - Monitoring tool
+2. Set up an RDS instance manually
+
+3. create a bucket on `kvdb.io`
+
+4. CircleCI enviroment
+
+  - enviroment variables for the project to use `aws-cli` orbs and builds
+
+  ![environment variables](./screenshots/env-variables.png)
+
+  - SSH keys (the `.pem` file AWS gave you when you create key pair) to generate fingerprint.
+
+And remember to suspend the Prometheus server and RDS after working since these things costs a lot (for me).
+
+### pipeline
+
+Make sure your CI-only workflow works first then work on the CD-only workflow.
+Saved me a lot of build minutes (>10m for CD workflows).
+When everything works, you can merge them.
+
+```bash
+# CD-only workflow circleci config.yml
+...
+workflows:
+  default:
+    jobs:
+      - deploy-infrastructure:
+      - configure-infrastructure:
+          requires: [ deploy-infrastructure ]
+      - run-migrations:
+          requires: [ configure-infrastructure ]
+      - deploy-frontend:
+          requires: [ run-migrations ]
+      - deploy-backend:
+          requires: [ run-migrations ]
+      - smoke-test:
+          requires: [ deploy-backend, deploy-frontend ]
+      - cloudfront-update:
+          requires: [ smoke-test ]
+      - cleanup:
+          requires: [ cloudfront-update ]
+```
+
+### Retrospective
+
+A lot of things doesn't work or just plain useless.
+I'm sure you can improve them.
 
 ### License
 

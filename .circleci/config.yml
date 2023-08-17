@@ -51,7 +51,7 @@ commands:
           name: Revert migrations
           when: << parameters.when >>
           command: |
-            SUCCESS=$(curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/migration_<< parameters.id >>)
+            SUCCESS=$(curl https://kvdb.io/bucket-url/migration_<< parameters.id >>)
             echo $SUCCESS
             if(( $SUCCESS ==1 )); 
             then
@@ -201,7 +201,7 @@ jobs:
               --filters "Name=tag:project,Values=udapeople-be-${CIRCLE_WORKFLOW_ID}" \
               --output text)
             echo "backend ip: ${BACKEND_IP}"
-            curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/BACKEND_URL -d "http://${BACKEND_IP}:3030"
+            curl https://kvdb.io/bucket-url/BACKEND_URL -d "http://${BACKEND_IP}:3030"
 
       - run:
           name: Ensure front-end infrastructure exist
@@ -289,16 +289,16 @@ jobs:
             if grep -c "executed successfully" migration.log
             then
               echo "Migration success, update kvdb"
-              curl "https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/migration_${CIRCLE_WORKFLOW_ID}" -d '1'
+              curl "https://kvdb.io/bucket-url/migration_${CIRCLE_WORKFLOW_ID}" -d '1'
             else
               echo "Migration failed"
-              curl "https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/migration_${CIRCLE_WORKFLOW_ID}" -d '0'
+              curl "https://kvdb.io/bucket-url/migration_${CIRCLE_WORKFLOW_ID}" -d '0'
             fi
       - run:
           name: Save the ID of the stack
           command: |
             echo "${CIRCLE_WORKFLOW_ID}"
-            curl "https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/wfid"  --trace - -d "\"${CIRCLE_WORKFLOW_ID}\""
+            curl "https://kvdb.io/bucket-url/wfid"  --trace - -d "\"${CIRCLE_WORKFLOW_ID}\""
 
       - revert-migrations:
           id: ${CIRCLE_WORKFLOW_ID}
@@ -318,7 +318,7 @@ jobs:
           name: Get backend url
           working_directory: ./frontend
           command: |
-            export BACKEND_URL=$(curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/BACKEND_URL)
+            export BACKEND_URL=$(curl https://kvdb.io/bucket-url/BACKEND_URL)
             echo "backend url: ${BACKEND_URL}"
 
             echo API_URL="${BACKEND_URL}" >> .env
@@ -377,7 +377,7 @@ jobs:
       - run:
           name: Backend smoke test.
           command: |
-            BACKEND_URL=$(curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/BACKEND_URL)
+            BACKEND_URL=$(curl https://kvdb.io/bucket-url/BACKEND_URL)
             echo "${BACKEND_URL}"
             curl "${BACKEND_URL}/api/status"
       - run:
@@ -421,7 +421,7 @@ jobs:
       - run:
           name: Remove old stacks and files
           command: |
-            export OldWorkflowID=$(curl https://kvdb.io/D3pG2H4NNFFoc5px1FoE9L/wfid | tr -d '"') # trim quotes
+            export OldWorkflowID=$(curl https://kvdb.io/bucket-url/wfid | tr -d '"') # trim quotes
             export CurrentWorkflowID="${CIRCLE_WORKFLOW_ID}"
 
             if [[ "$CurrentWorkflowID" != "$OldWorkflowID" ]]

@@ -9,25 +9,3 @@ groups:
     annotations:
       summary: 'Instance is down'
       description: 'Job has been down for more than 1 minutes.'
-
-#- name: Usage
-#  rules:
-#    # Alert for any cluster that has average CPU idle < 50%
-#    - alert: HighUsage
-#      expr: avg(irate(node_cpu_seconds_total{mode="idle"}[1m]) * 100) < 50
-#      for: 1m
-#      annotations:
-#        summary: "High usage on {{ $labels.instance }}"
-#        description: "{{ $labels.instance }} has a average CPU idle (current value: {{ $value }}s)"
-
-- name: Host and hardware
-  exporters:
-    - name: node-exporter
-      slug: node-exporter
-      doc_url: https://github.com/prometheus/node_exporter
-      rules:
-        - name: Host out of memory
-          description: Node memory is filling up (< 10% left)
-          query: '(node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10) * on(instance) group_left (nodename) node_uname_info{nodename=~".+"}'
-          severity: warning
-          for: 2m
